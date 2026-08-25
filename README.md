@@ -1,118 +1,80 @@
-# 猿急送爬虫
+# 猿急送爬虫项目
 
-Python 异步爬虫，抓取 [猿急送](https://www.yuanjisong.com/) 兼职项目列表，自动过滤后输出 Excel。
+## 项目简介
 
-## 功能
+本项目是一个针对 [猿急送](https://www.yuanjisong.com/)（国内兼职技术任务平台）的自动化数据抓取与分析工具，帮助大学生和技术爱好者快速筛选出预算合理、难度适中、技术方向匹配的项目。
 
-- **反检测抓取**：`curl_cffi` 模拟 Chrome 131 TLS/HTTP2 指纹，带代理池轮转、403 指数退避、断点续爬
-- **多方案支持**：轻量版（直连）、Firecrawl 代理版
-- **自动分类**：按技术栈将项目分为爬虫、前端、后端、AI、小程序等 10 个类别
-- **学生项目筛选**：自动过滤预算 ≤500 元、非驻场、排除高风险关键词的项目
-- **代理池**：自动从快代理/free-proxy-list 抓取并测试，失败自动拉黑，定期恢复
+## 核心问题
+
+猿急送平台上每天有数百个兼职任务发布，但信息分散、筛选困难。手动翻页浏览效率低，且难以从大量项目中精准找到适合自己技能水平的项目。本项目通过自动化抓取 + 智能过滤，解决这一痛点。
+
+## 主要功能
+
+### 1. 高效抓取
+- 基于 `curl_cffi` 异步并发，模拟 Chrome 131 TLS 指纹，绕过基础反爬
+- 内置代理池自动轮换，含免费代理源抓取、连通性测试、失败黑名单机制
+- 支持断点续爬，网络中断后可从最后有效页继续
+
+### 2. 智能过滤
+- 内置多层关键词黑名单，自动排除以下类型项目：
+  - **高难度**：架构、高级、专家、底层、内核、编译原理、逆向工程
+  - **敏感/违规**：翻墙、VPN、破解、刷单、赌博、洗钱、学术不端
+  - **硬件/IoT**：stm32、嵌入式、单片机、物联网、FPGA
+  - **游戏开发**：Unity、手游、网游
+- 输出三个分类 Excel：全部项目、学生适用项目（≤500元）、Python 相关项目
+
+### 3. 技术分类
+- `classify.py` 根据项目标题和描述关键词，将任务自动归类为 10 个技术方向：
+  - 爬虫-数据采集、Python脚本、前端/Web页面、小程序/移动端
+  - 后端/接口/部署、AI/智能体、测试/质检、嵌入式/IoT/硬件、工具/其他脚本、通用项目
+- 按分类分 Sheet 输出，方便按兴趣定向浏览
+
+### 4. 学生项目筛选
+- `filter_student_projects.py` 进一步从抓取结果中筛选适合大学生的项目：
+  - 预算 ≤500 元
+  - 非驻场工作
+  - 排除高风险/高难度关键词
+- 按预算升序排列，低价项目优先展示
+
+## 技术栈
+
+| 组件 | 技术选型 | 说明 |
+|------|---------|------|
+| 爬虫框架 | curl_cffi + asyncio | 异步请求，模拟真实浏览器指纹 |
+| HTML 解析 | BeautifulSoup4 | 处理嵌套 DOM 结构 |
+| 数据处理 | openpyxl | Excel 读写与样式格式化 |
+| 日志 | loguru | 结构化日志，自动轮转 |
+| 代理池 | 自建 ProxyPool | 免费代理自动抓取+连通测试+权重轮转 |
 
 ## 项目结构
 
 ```
-.
-├── scrape_lightweight.py    # 主爬虫（curl_cffi 异步版，推荐）
-├── scrape_firecrawl.py      # Firecrawl 方案（需配合 Claude Code MCP 使用）
-├── proxy_pool.py            # 代理池（自动抓取+测试+轮转+黑名单）
-├── classify.py              # 项目分类器（按技术栈分 sheet 输出）
-├── filter_student_projects.py  # 学生项目筛选器（预算≤500元）
-├── requirements.txt         # 依赖
-├── .env                     # 配置（本地使用，未入库）
-└── 数据/                    # 输出目录（未入库）
+yuanjisong-scraper/
+├── scrape_lightweight.py        # 主爬虫（推荐）
+├── scrape_firecrawl.py          # Firecrawl 备选方案
+├── proxy_pool.py                # 代理池管理
+├── classify.py                  # 项目分类器
+├── filter_student_projects.py   # 学生项目筛选
+├── requirements.txt             # 依赖列表
+├── .gitignore                   # 排除敏感文件
+└── README.md                    # 本文档
 ```
 
-## 安装
+## 使用流程
 
-```bash
-pip install -r requirements.txt
+```
+1. 抓取数据  →  python scrape_lightweight.py --max-pages 50
+2. 查看结果  →  数据/yuanjisong_*.xlsx
+3. 项目分类  →  python classify.py
+4. 筛选学生项目 → python filter_student_projects.py
 ```
 
-依赖：`curl_cffi` `beautifulsoup4` `openpyxl` `loguru`
+## 输出示例
 
-## 使用方式
-
-### 1. 抓取项目
-
-```bash
-# 抓取全部（默认300页，约30分钟）
-python scrape_lightweight.py
-
-# 指定页数
-python scrape_lightweight.py --max-pages 50
-
-# 断点续爬（从上次中断处继续）
-python scrape_lightweight.py --resume
-
-# 不排除关键词（调试用）
-python scrape_lightweight.py --include
-```
-
-**输出文件（均在 `数据/` 目录）：**
-
-| 文件 | 说明 |
-|------|------|
-| `yuanjisong_时间戳.xlsx` | 全部可投递项目 |
-| `student_时间戳.xlsx` | 预算 ≤500 元的项目 |
-| `python_时间戳.xlsx` | Python 相关项目 |
-
-### 2. 分类（已有抓取结果后）
-
-```bash
-python classify.py
-```
-
-输入：`数据/python-freshman.xlsx`
-输出：`数据/python-projects-v2.xlsx`（按分类分 sheet）
-
-### 3. 筛选学生项目（已有抓取结果后）
-
-```bash
-python filter_student_projects.py
-```
-
-输入：`数据/yuanjisong_jobs.xlsx`
-输出：`数据/student-friendly.xlsx`
-
-### 4. Firecrawl 方案（IP 被封时使用）
-
-先在 Claude Code 中调用 `firecrawl_scrape` 逐页抓取 markdown，再保存为 JSON 解析：
-
-```bash
-python scrape_firecrawl.py --input data.json --pages 10
-```
-
-## 排除关键词
-
-爬虫内置自动过滤以下类型项目：
-
-| 类别 | 关键词示例 |
-|------|-----------|
-| 高难度 | 架构、高级、专家、底层、内核、编译原理、逆向工程 |
-| 算法/AI | 算法、深度学习、区块链、量化 |
-| 安全相关 | 渗透测试、漏洞挖掘、密码学、安全研究、反作弊 |
-| 灰产/违规 | 接码平台、翻墙、VPN代理、破解、刷单、洗钱、赌博 |
-| 学术不端 | 代写论文、代做毕设 |
-| 硬件/IoT | stm32、嵌入式、树莓派、单片机、物联网、FPGA |
-| 游戏 | unity、game、网游、手游 |
-| 光学/相机 | 相机、标定、镜头 |
-
-## 代理池说明
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| 代理源 | 快代理、free-proxy-list.net | 每次初始化从两个源各抓 50 个 |
-| 拉黑阈值 | 连续失败 3 次 | 达到阈值加入黑名单 |
-| 恢复间隔 | 300 秒 | 黑名单代理到期后自动恢复测试 |
-| 刷新间隔 | 1800 秒（30分钟） | 后台定期重新抓取代理 |
-
-代理成功率加权随机选取，成功率高的代理被选中的概率更大。
+每个抓取代次生成一个 Excel 文件，列包括：序号、项目标题、项目状态、工时、预算、投递人数、发布者、项目描述、项目链接。
 
 ## 注意事项
 
-- `.env` 文件包含 Cookie 和代理配置，**已加入 `.gitignore`**，不会被上传
-- `.cookies.json` 保存会话状态，供断点续爬恢复使用
-- 首次运行时代理池测试需要约 10~30 秒，等待完成后即可开始抓取
-- 如果 IP 被封，建议使用 Firecrawl 方案作为备选
+- 本项目仅用于学习交流，请遵守目标网站的服务条款
+- `.env` 和 `.cookies.json` 包含本地会话信息，已加入 `.gitignore`
+- 输出数据文件（`.xlsx`/`.csv`）已排除在版本控制之外
