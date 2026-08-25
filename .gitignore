@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.logs/
+playwright-mcp/
+.playwright-mcp/
+*.xlsx
+*.csv
+数据/
+.env
+.cookies.json
+.last_page.txt
+logs/
